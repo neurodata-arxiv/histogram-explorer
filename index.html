@@ -1,0 +1,261 @@
+
+<!DOCTYPE html>
+<html lang="en" ng-app="windowingApp">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <!-- The above 2 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>Histogram Explorer</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/smoothness/jquery-ui.css">
+    <link rel='stylesheet' href='//cdnjs.cloudflare.com/ajax/libs/angular-loading-bar/0.7.1/loading-bar.min.css' type='text/css' media='all' />
+
+    <style>
+      #img {
+        display: block;
+        margin: 0 auto;
+        padding-top: 15px;
+      }
+      .centeredButton {
+        display: block;
+        margin: 0 auto;
+      }
+    </style>
+
+
+    <!-- load jquery before angular to be able to use scope -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script>
+
+    <script src="js/angular.min.js"></script>
+    <script src="js/angular-resource.min.js"></script>
+    <script src="js/angular-animate.min.js"></script>
+    <script type='text/javascript' src='//cdnjs.cloudflare.com/ajax/libs/angular-loading-bar/0.7.1/loading-bar.min.js'></script>
+    <!-- Angular App -->
+    <script src="app/js/app.js"></script>
+    <script src="app/js/controllers.js"></script>
+    <script src="app/js/services.js"></script>
+    <!-- End Angular App -->
+
+  </head>
+
+  <body>
+
+    <div class="container">
+
+      <div class="page-header">
+        <h1>The NDStore Histogram Explorer</h1>
+        <p class="lead">An interactive tool to determine the appropriate window range for a 16-bit project.</p>
+      </div>
+
+      <div id="statsController" ng-controller="statsController" ng-cloak>
+        <div class="row">
+          <div class="col-md-12">
+            <form class="form-inline">
+              <div class="form-group">
+                <label class="sr-only" for="token">Token</label>
+                <input type="text" class="form-control" id="token" placeholder="Token" ng-model="token">
+              </div>
+              <div class="form-group">
+                <label class="sr-only" for="channel">Channel</label>
+                <input type="text" class="form-control" id="channel" placeholder="Channel" ng-model="channel">
+              </div>
+              <button class="btn btn-primary" ng-click="loadHistogram(kharris15apical, em)">Load Histogram</button>
+            </form>
+            <div class="row" ng-hidden="error == null">
+              <div class="col-md-12">
+                <p class="bg-danger">{{ error }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="row" ng-hide="stats == null">
+          <div class="col-md-12">
+            <h2>Displaying statistics for {{ retrievedToken }}, channel {{ retrievedChannel }}</h2>
+            <div id="plot">
+            </div>
+          </div>
+        </div>
+        <div class="row" ng-hide="stats == null">
+          <div class="col-md-6">
+            <div class="row">
+              <h3>Percentile Slider:</h3>
+            </div>
+            <div class="row" style="padding:10px;">
+              <div id="percentileSlider"></div>
+            </div>
+            <div class="row">
+              <div class="col-md-12">
+                <h2><span id="curPercentile">50</span>% = {{ curPercentSlider }}</h2>
+                <div class="row">
+                  <div class="col-md-6">
+                    <button class="btn btn-primary centeredButton" ng-click="setMax(curPercentSlider)">Copy to Max</button>
+                  </div>
+                  <div class="col-md-6">
+                    <button class="btn btn-primary centeredButton" ng-click="setMin(curPercentSlider)">Copy to Min</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <h3>Common Statistics:</h3>
+            <table class="table table-condensed">
+              <tr>
+                <td>Mean</td>
+                <td>{{ stats.mean }}</td>
+              </tr>
+              <tr>
+                <td>Standard Deviation</td>
+                <td>{{ stats.stddev }}</td>
+              </tr>
+              <tr>
+                <td>Minimum</td>
+                <td>{{ stats.min }}</td>
+              </tr>
+              <tr>
+                <td>Maximum</td>
+                <td>{{ stats.max }}</td>
+              </tr>
+              <tr>
+                <td>1%</td>
+                <td>{{ stats.percents[1] }}</td>
+              </tr>
+              <tr>
+                <td>50%</td>
+                <td>{{ stats.percents[50] }}</td>
+              </tr>
+              <tr>
+                <td>99%</td>
+                <td>{{ stats.percents[99] }}</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="row" id="imgController" ng-controller="imgController" ng-hide="hidden == true">
+          <div class="col-md-12">
+            <h2>Displaying image for {{ token }}, channel {{ channel }}</h2>
+          </div>
+          <div class="col-md-6">
+            <h3>Current Window:</h3>
+              <form class="form-horizontal">
+                <div class="form-group">
+                  <label for="min" class="col-sm-2 control-label">min</label>
+                  <div class="col-sm-10">
+                    <input type="number" class="form-control" placeholder="min" ng-model="min" ng-change="updateWindowSlider()">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="max" class="col-sm-2 control-label">max</label>
+                  <div class="col-sm-10">
+                    <input type="number" class="form-control" placeholder="max" ng-model="max" ng-change="updateWindowSlider()">
+                  </div>
+                </div>
+                <button class="btn btn-primary" ng-click="applyWindow()">Apply Window to Image</button>
+              </form>
+          </div>
+          <div class="col-md-6">
+            <h3>Image Coordinates:</h3>
+              <form class="form-horizontal">
+                <div class="form-group">
+                  <label for="res" class="col-sm-2 control-label">resolution</label>
+                  <div class="col-sm-10">
+                    <input type="number" class="form-control" placeholder="resolution" ng-model="resolution" ng-change="reloadImage()">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="xmin" class="col-sm-2 control-label">x min</label>
+                  <div class="col-sm-10">
+                    <input type="number" class="form-control" placeholder="xmin" ng-model="xmin" ng-change="reloadImage()">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="xmax" class="col-sm-2 control-label">x max</label>
+                  <div class="col-sm-10">
+                    <input type="number" class="form-control" placeholder="xmax" ng-model="xmax" ng-change="reloadImage()">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="ymin" class="col-sm-2 control-label">y min</label>
+                  <div class="col-sm-10">
+                    <input type="number" class="form-control" placeholder="ymin" ng-model="ymin" ng-change="reloadImage()">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="ymax" class="col-sm-2 control-label">y max</label>
+                  <div class="col-sm-10">
+                    <input type="number" class="form-control" placeholder="ymax" ng-model="ymax" ng-change="reloadImage()">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="zidx" class="col-sm-2 control-label">z index</label>
+                  <div class="col-sm-10">
+                    <input type="number" class="form-control" placeholder="zidx" ng-model="zidx" ng-change="reloadImage()">
+                  </div>
+                </div>
+              </form>
+          </div>
+          <div class="col-md-12">
+            <div id="windowSlider"></div>
+            <div class="row" ng-hide="imgUrl == null">
+              <img id="img" ng-src="{{ imgUrl }}">
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div> <!-- /container -->
+
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/plotly.min.js"></script>
+    <script>
+      function plotHistogram(hist, bins) {
+        var data = [
+          {
+            y: hist,
+            x: bins,
+            type: 'bar',
+          }
+        ];
+        Plotly.newPlot('plot', data);
+      };
+      function emptyPlot() {
+        $("#plot").empty();
+      }
+      $( "#percentileSlider" ).slider({
+        value: 50,
+        orientation: "horizontal",
+        animate: true,
+        min: 0,
+        max: 100,
+        step: 1,
+        slide: function( event, ui ) {
+          $("#curPercentile").text(ui.value);
+          angular.element("#statsController").scope().getPercentile(ui.value);
+        },
+      });
+      $( "#windowSlider" ).slider({
+        range: true,
+        min: 0,
+        max: 65536,
+        values: [0,65536],
+        slide: function( event, ui ) {
+          angular.element("#imgController").scope().updateWindow(ui.values[0], ui.values[1]);
+        },
+      });
+      function updateWindowSliderMax(max) {
+        $( "#windowSlider" ).slider("values",1,max);
+      }
+      function updateWindowSliderMin(min) {
+        $( "#windowSlider" ).slider("values",0,min);
+      }
+    </script>
+  </body>
+</html>
